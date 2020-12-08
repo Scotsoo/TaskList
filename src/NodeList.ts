@@ -1,33 +1,34 @@
-import { writeFileSync } from "fs"
-import { Stream } from "stream"
 import * as logUpdate from 'log-update'
-
-interface TaskConstructorArgs {
-  title: string
-  enabled?: boolean
-  skip?: () => boolean
-  taskList?: Task[]
-  task?: () => any
+import * as chalk from 'chalk'
+const icons = {
+  success: chalk.green('✔'),
+  fail: chalk.red('❌')
 }
-const processingFrames = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏']
+interface TaskConstructorArgs<T> {
+  title: string
+  skip?: () => boolean
+  taskList?: Task<T>[]
+  task?: (ctx: T, self: Task<T>) => any
+}
+const processingFrames = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'].map(m => chalk.cyan(m))
 const processingFramesLength = processingFrames.length
-export default class NodeList {
-  private taskList: Task[]
+export default class NodeList<T extends {}> {
+  private taskList: Task<T>[]
   private interval: NodeJS.Timeout | undefined
-  constructor(tasks: Task[]) {
+  constructor(tasks: Task<T>[]) {
     this.taskList = tasks
   }
   public print () {
     this.interval = setInterval(() => {
-      // console.log(this.getText())
       logUpdate(this.getText())
+      console.log(this.getText())
     }, 100)
 
   }
   public async run (): Promise<void> {
     this.print()
     for (const task of this.taskList) {
-      await task.run()
+      await task.run({} as any)
     }
     setTimeout(() => {
       if (this.interval !== undefined) {
@@ -47,19 +48,17 @@ export default class NodeList {
   }
 }
 
-export class Task {
-  private taskState: TaskState = TaskState.NONE
-  private title: string
-  private enabled: boolean
+export class Task<T extends {} = {}> {
+  protected taskState: TaskState = TaskState.NONE
+  public title: string
   private skip: () => boolean
-  private taskList: Task[] | undefined
-  private task: (() => Promise<any>) | undefined
+  private taskList: Task<T>[] | undefined
+  private task: ((ctx: T, task: this) => Promise<any>) | undefined
   private isRunning: boolean = false
   private isFinished: boolean = false
   private proceccingFrameIndex: number = 0
-  constructor (args: TaskConstructorArgs) {
+  constructor (args: TaskConstructorArgs<T>) {
     this.title = args.title
-    this.enabled = args.enabled || true
     this.skip = args.skip || (() => false)
     this.taskList = args.taskList
     this.task = args.task
@@ -74,38 +73,43 @@ export class Task {
       this.finalPrintText = `${prefix}${this.title} [Skipped]`
       return this.finalPrintText
     }
-
+    if (this.taskList !== undefined && this.task !== undefined) {
+      throw new Error('Unable to have taskList and task provided. Provide one or the other.')
+    }
     if (this.task !== undefined) {
       if (this.isFinished) {
-        console.log(`${this.title} is finished`)
         let finalOutput = ''
         let icon = ''
         if (this.taskState == TaskState.SUCCESS) {
-          icon = '✔'
+          icon = icons.success
         } else if (this.taskState === TaskState.FAIL) {
-          icon = '❌'
+          icon = icons.fail
         }
         finalOutput = `${prefix}${icon} ${this.title}\n`
         this.finalPrintText = finalOutput
         return finalOutput
       }
       if (this.isRunning) {
-        return `${prefix}${processingFrames[this.proceccingFrameIndex ++ % processingFramesLength]} ${this.title} - running\n`
+        return `${prefix}${processingFrames[this.proceccingFrameIndex ++ % processingFramesLength]} ${this.title}\n`
       } else {
-        return `${prefix} ${this.title}`
+        return `${prefix} ${this.title}\n`
       }
     } else if (this.taskList !== undefined) {
       let output = ''
       if (this.isFinished) {
         let icon = ''
         if (this.taskState == TaskState.SUCCESS) {
-          icon = '✔'
+          icon = icons.success
         } else if (this.taskState === TaskState.FAIL) {
-          icon = '❌'
+          icon = icons.fail
         }
         output = `${prefix}${icon} ${this.title}\n`
       } else {
-        output = `${prefix}${prefix}${processingFrames[this.proceccingFrameIndex ++ % processingFramesLength]}${this.title}\n`
+        if (this.isRunning) {
+          output = `${prefix}${prefix}${processingFrames[this.proceccingFrameIndex ++ % processingFramesLength]} ${this.title}\n`
+        } else {
+          return `${prefix} ${this.title}\n`
+        }
       }
       if (this.taskState === TaskState.SUCCESS) {
         return output
@@ -121,23 +125,26 @@ export class Task {
     return 'missed case'
   }
 
-  public async run (): Promise<void> {
+  public async run (ctx: T): Promise<void> {
     this.isRunning = true
     if (!this.skip()) {
       if (this.task !== undefined) {
         try {
           if (!this.skip()) {
-            await this.task()
+            await this.task(ctx, this)
           }
           this.taskState = TaskState.SUCCESS
         } catch (e) {
           this.taskState = TaskState.FAIL
-          throw e
+          this.title += `: Fail Reason: ${e}`
         }
       } else if (this.taskList !== undefined) {
         for (const task of this.taskList) {
           try {
-            await task.run()
+            await task.run(ctx)
+            if (task.taskState === TaskState.FAIL) {
+              this.taskState  = TaskState.FAIL
+            }
           } catch {
             this.taskState = TaskState.FAIL
           }
@@ -149,11 +156,12 @@ export class Task {
     }
     this.isRunning = false
     this.isFinished = true
-    await new Promise((resolve) => {
-      setTimeout(() => {
-        resolve(true)
-      }, 700)
-    })
+    // await new Promise((resolve) => {
+    //   setTimeout(() => {
+    //     resolve(true)
+    //   }, 700)
+    // })
+    return undefined
   }
 }
 
