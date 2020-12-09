@@ -1,10 +1,11 @@
-import NodeList, { Task } from './NodeList'
+import { resolve } from 'path'
+import TaskList, { Task } from './TaskList'
 interface Context {
   a: string
   b: string
 }
 type ThisTask = Task<Context>
-const list = new NodeList<Context>([
+const list = new TaskList<Context>([
   new Task({
     title: 'Test',
     taskList: [
@@ -69,6 +70,50 @@ const list = new NodeList<Context>([
     ]
   })
 ])
+
+
+// const list = new TaskList([
+//   new Task({
+//     title: '1',
+//     taskList: [
+//       new Task({
+//         title: '2',
+//         taskList: [
+//           new Task({
+//             title: '3',
+//             taskList: [
+//               new Task({
+//                 title: '4',
+//                 taskList: [
+//                   new Task({
+//                     title: '5',
+//                     taskList: [
+//                       new Task({
+//                         title: '6',
+//                         taskList: [
+//                           new Task({
+//                             title: 'Actual task',
+//                             task: async () => {
+//                               await new Promise((resolve) => {
+//                                 setTimeout(() => {
+//                                   resolve('')
+//                                 }, 5000)
+//                               })
+//                             }
+//                           })
+//                         ]
+//                       })
+//                     ]
+//                   })
+//                 ]
+//               })
+//             ]
+//           })
+//         ]
+//       })
+//     ]
+//   })
+// ])
 
 
 list.run()

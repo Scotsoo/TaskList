@@ -12,7 +12,7 @@ interface TaskConstructorArgs<T> {
 }
 const processingFrames = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'].map(m => chalk.cyan(m))
 const processingFramesLength = processingFrames.length
-export default class NodeList<T extends {}> {
+export default class TaskList<T extends {}> {
   private taskList: Task<T>[]
   private interval: NodeJS.Timeout | undefined
   constructor(tasks: Task<T>[]) {
